@@ -1,9 +1,13 @@
 #include<reg51.h> // Include Header file to work With 8051 Family Microcontroller
-
+#include<stdio.h> // Include stdio.h , as we are using sprintf() function
 #define LCDPort P1  // LCD data/Command bus (PIBN 7 to PIN 14) is Connected to P1 (PIN 1 to PIN 8) of 8051
 sbit  RS=P0^0; // RS pin of LCD (PIN 4) is Connected to P0.0 (PIN 39) of 8051
 sbit  RW=P0^1; // RW pin of LCD (PIN 5) is Connected to P0.1 (PIN 38) of 8051
 sbit  EN=P0^2; // EN pin of LCD (PIN 6) is Connected to P0.2 (PIN 37) of 8051
+sbit SENSOR=P3^2; // The PULSE Sensor is Connected with P3.2 (PIN 12) of 8051
+
+
+
 //------------------------------------------------------------------------------//
 void delay(int t) // This function will generate approx t ms delay
 {
@@ -60,6 +64,10 @@ void LCDPuts(char *s) // This function will Display a string on LCD
 
 void main() // the main() function start here
 {
+   
+   int PULSE=0; // Declare Local Variable PULSE to store the PULOSE Count
+   int UNIT=0;  // Declare Variable to Store UNIT
+   char buffer[10]; // Declare an array of character to store converted data
    LCDInit(); // Initilizing the LCD
    
    LCDPuts("   IoT  Based   ");
@@ -104,6 +112,33 @@ void main() // the main() function start here
       
    while(1)  // Starting of main indefinit loop
     {
+	  
+	    if(SENSOR==0) // if Sensor Output Goes LOW
+		 {
+            PULSE++; // Increase the PULSE by +1
+			sprintf(buffer,"%4d",PULSE); // Convert the Numeric PULSE Value into String, and store it in buffer
+			LCDCommand(0xc6); // Move the Cursor to the 6th position of 2nd Line
+			LCDPuts(buffer); // and display the data stored in buffer(PULSE)
+			while(SENSOR==0); // Wait unitl the sensor OUTPUT goes LOW
+			if(PULSE>=10) // if PULSE become 10 (in case of actual implementation it will be 800/1600/3200 depending on meter)
+			 {
+                 UNIT++; // Increase the value of UNIT by +1
+                 PULSE=0; // Reset the Value of PULSE to 0
+
+			   sprintf(buffer,"%4d",UNIT); // Convert the Numeric UNIT Value into String, and store it in buffer
+			   LCDCommand(0x86); // Move the Cursor to the 6th position of 1st Line
+			   LCDPuts(buffer); // and display the data stored in buffer(UNIT)
+
+			   
+			   sprintf(buffer,"%4d",PULSE); // Convert the Numeric PULSE Value into String, and store it in buffer
+			   LCDCommand(0xc6); // Move the Cursor to the 6th position of 2nd Line
+			   LCDPuts(buffer); // and display the data stored in buffer(PULSE)
+
+			  
+			 }
+		 }
+
+
 
 	}
     
