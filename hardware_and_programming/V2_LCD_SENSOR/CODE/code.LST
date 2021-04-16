@@ -1,0 +1,390 @@
+C51 COMPILER V8.12   CODE                                                                  04/24/2019 13:48:28 PAGE 1   
+
+
+C51 COMPILER V8.12, COMPILATION OF MODULE CODE
+OBJECT MODULE PLACED IN code.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE code.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include<reg51.h> // Include Header file to ork with 8051 Family Microcontroller
+   2          #include<string.h>
+   3          #include <stdio.h>
+   4          #include<stdlib.h>
+   5          //---------------------------
+   6          sbit sda=P2^1;
+   7          sbit scl=P2^0;
+   8          int ack;
+   9          unsigned char reead,write,write2,i,j;
+  10          unsigned int temp;
+  11          //----------------------------------
+  12          void init(void);
+  13          void tx(char);
+  14          char rx(void);
+  15          void xputs(char *);
+  16          //----------------------------------
+  17          void aknowledge()         //acknowledge condition
+  18          {
+  19   1              scl=1;
+  20   1              scl=0;
+  21   1      } 
+  22          void start()            //start condition
+  23          {
+  24   1              sda=1;
+  25   1              scl=1;
+  26   1              sda=0;
+  27   1              scl=0;
+  28   1      }
+  29          void stop()                     //stop condition
+  30          {
+  31   1              sda=0;
+  32   1              scl=1;
+  33   1              sda=1;
+  34   1              scl=0;
+  35   1      }
+  36          void send_byte(unsigned char value)     //send byte serially
+  37          { 
+  38   1              unsigned int i;
+  39   1              unsigned char send;
+  40   1              send=value;
+  41   1              for(i=0;i<8;i++)
+  42   1              {
+  43   2                      sda=send/128;                   //extracting MSB
+  44   2                      send=send<<1;                   //shiftng left
+  45   2                      scl=1;
+  46   2                      scl=0;
+  47   2              }
+  48   1      }
+  49          unsigned char read_byte()                       //reading from EEPROM serially
+  50          {
+  51   1              unsigned int i;
+  52   1              sda=1;
+  53   1              reead=0;
+  54   1              for(i=0;i<8;i++)
+  55   1              {
+C51 COMPILER V8.12   CODE                                                                  04/24/2019 13:48:28 PAGE 2   
+
+  56   2                      reead=reead<<1;
+  57   2                      scl=1;
+  58   2                      if(sda==1)
+  59   2                              reead++;
+  60   2                      scl=0;
+  61   2              }
+  62   1              return reead;                           //Returns 8 bit data here
+  63   1      }               
+  64          void EEPROMSave(char *s)                                        //save in EEPROM
+  65          {
+  66   1              start();
+  67   1              send_byte(0xA0);                                                //device address
+  68   1              send_byte(0x00);                                                //word address
+  69   1              for(i=0;s[i]!='\0';i++)
+  70   1               {
+  71   2                 send_byte(s[i]);                                                     //send data
+  72   2                 aknowledge();
+  73   2               }
+  74   1      
+  75   1              stop();                                                    
+  76   1      }
+  77          void EEPROMRead(char *EEPROMData)
+  78          {
+  79   1              int i;
+  80   1              char c;
+  81   1              start();
+  82   1              send_byte(0xA0);
+  83   1              send_byte(0x00);
+  84   1              start();
+  85   1              send_byte(0xA1);                                         //device address
+  86   1          for(i=0;i<100;i++)
+  87   1                {
+  88   2                  c=read_byte();
+  89   2                      EEPROMData[i]=c;
+  90   2                }
+  91   1              EEPROMData[i]=0;
+  92   1              stop();
+  93   1      }
+  94          
+  95          
+  96          #define LCDPort P1   // LCD data/Command bus are connected to P1 of 8051
+  97          sbit    RS=P0^0;     // The RS pin of LCD (PIN 4) is Connected to P0.0 (PIN 39) of 8051
+  98          sbit    RW=P0^1;     // The RW pin of LCD (PIN 5) is Connected to P0.1 (PIN 38) of 8051
+  99          sbit    EN=P0^2;     // The EN pin of LCD (PIN 6) is Connected to P0.2 (PIN 37) of 8051
+ 100          sbit SENSOR=P3^2;
+ 101          sbit RESET=P2^2;
+ 102          
+ 103          
+ 104          char strUnit[5];
+ 105          int Pulse=0;
+ 106          int Unit=0;
+ 107          int LastPulse=0;
+ 108          int LastUnit=0;
+ 109          void delay(int t)    // This function will generate t ms Delay
+ 110           {
+ 111   1            int i;
+ 112   1                while(t>0)
+ 113   1                 {
+ 114   2                    i=1275;
+ 115   2                        while(i>0) i--;
+ 116   2                        t--;
+ 117   2                 }
+C51 COMPILER V8.12   CODE                                                                  04/24/2019 13:48:28 PAGE 3   
+
+ 118   1      
+ 119   1       }
+ 120          
+ 121          
+ 122          void LCDCommand(char c) // This function will send a command to LCD
+ 123           {
+ 124   1              RS=0; // RS=0 means, we are sending Command to LCD
+ 125   1              RW=0; // RW=0 means, we are using the LCD in Write Mode
+ 126   1              LCDPort=c; // Copy the value of c(Command) into LCDPort (P1 in our Case)
+ 127   1              EN=1;      // Set EN pin High -----------------+
+ 128   1              delay(1);  // Wait for 2 ms                                        +--- Generate a high to low Pulse
+ 129   1              EN=0;      // Reset the EN pin Back to Low ----+
+ 130   1              
+ 131   1       }
+ 132          
+ 133          void LCDData(char c) // This function will send a Data to LCD
+ 134           {
+ 135   1              RS=1; // RS=1 means, we are sending Data to LCD
+ 136   1              RW=0; // RW=0 means, we are using the LCD in Write Mode
+ 137   1              LCDPort=c; // Copy the value of c(Data) into LCDPort (P1 in our Case)
+ 138   1              EN=1;      // Set EN pin High -----------------+
+ 139   1              delay(1);  // Wait for 2 ms                                        +--- Generate a high to low Pulse
+ 140   1              EN=0;      // Reset the EN pin Back to Low ----+
+ 141   1       }
+ 142          
+ 143          // To use the LCD we must have to Initilized it
+ 144          
+ 145          void LCDInit() // This function will initilized the LCD
+ 146           {
+ 147   1           LCDCommand(0x38); // 0x38 - 8 bit Mode
+ 148   1               LCDCommand(0x06); // 0x06 - Display from Left to Right
+ 149   1               LCDCommand(0x0c); // 0x0c - Display On, Cursor Hide
+ 150   1               LCDCommand(0x01); // 0x01 - Clear LCD
+ 151   1       }
+ 152          /* String: String is nothing but array of characters, terminated by NULL('\0')
+ 153                     Array index start from 0
+ 154          */
+ 155                                       
+ 156          void LCDPuts(char *s)  // This function will Display a string on LCD
+ 157           {
+ 158   1             int i;
+ 159   1                 for(i=0; s[i]!='\0';i++) LCDData(s[i]);
+ 160   1      
+ 161   1       }
+ 162          
+ 163           //-----------------------------------------------
+ 164           void init()
+ 165           {
+ 166   1         TMOD=0x20;
+ 167   1         SCON=0x50;
+ 168   1         TH1=0xfd;
+ 169   1         TR1=1;
+ 170   1       }
+ 171          void tx(char c)
+ 172           {
+ 173   1         SBUF=c;
+ 174   1         while(TI==0);
+ 175   1         TI=0;
+ 176   1       }
+ 177          void xputs(char *s)
+ 178           {
+ 179   1         int i;
+C51 COMPILER V8.12   CODE                                                                  04/24/2019 13:48:28 PAGE 4   
+
+ 180   1         for(i=0;s[i]!='\0';i++)
+ 181   1          {
+ 182   2                tx(s[i]);
+ 183   2              }
+ 184   1      
+ 185   1       }
+ 186           void ESP8266_Init()
+ 187           {
+ 188   1          xputs("AT");
+ 189   1              tx(10);
+ 190   1              tx(13);
+ 191   1              delay(100);
+ 192   1      
+ 193   1      
+ 194   1          xputs("AT+CWMODE=1");
+ 195   1              tx(10);
+ 196   1              tx(13);
+ 197   1              delay(100);
+ 198   1      
+ 199   1      
+ 200   1          xputs("AT+CIPMUX=1");
+ 201   1              tx(10);
+ 202   1              tx(13);
+ 203   1              delay(100);
+ 204   1      
+ 205   1       }
+ 206          void startTCPConnection()
+ 207           {
+ 208   1         xputs("AT+CIPSTART=4,TCP,SERVER,80");
+ 209   1         tx(10);
+ 210   1         tx(13);
+ 211   1        
+ 212   1       }
+ 213          void initTCP()
+ 214          { 
+ 215   1       
+ 216   1        xputs("AT+CIPSEND=4,200");
+ 217   1        tx(10);
+ 218   1        tx(13);
+ 219   1       }
+ 220          
+ 221          void sendTCPData()
+ 222          {
+ 223   1       
+ 224   1       
+ 225   1        xputs("/aeciotemeter.com/update.php?MID=M001&UNIT="); //  40   - 57
+ 226   1        xputs(strUnit);
+ 227   1        tx(10);       
+ 228   1        tx(13);       
+ 229   1        
+ 230   1      }
+ 231          
+ 232          
+ 233          //------------------------------------------------
+ 234          void getPulse() 
+ 235           {
+ 236   1           Pulse++;
+ 237   1               delay(10);
+ 238   1               if(Pulse>=10)
+ 239   1                {
+ 240   2                  LCDCommand(0x8A);
+ 241   2                  LCDData('0');
+C51 COMPILER V8.12   CODE                                                                  04/24/2019 13:48:28 PAGE 5   
+
+ 242   2                      Pulse=0;
+ 243   2                      Unit++;
+ 244   2                }
+ 245   1       } 
+ 246          //------------------------------------------------
+ 247          void main() // the main() function start here
+ 248           {
+ 249   1              char buffer[6];
+ 250   1              init();
+ 251   1              LCDInit(); // Initilizing the LCD
+ 252   1      
+ 253   1          if(RESET==0)
+ 254   1               {
+ 255   2                 EEPROMSave("0");
+ 256   2                 LCDPuts("RESET READING");
+ 257   2                 delay(100);
+ 258   2      
+ 259   2               }
+ 260   1      
+ 261   1              LCDCommand(0x01);
+ 262   1          LCDPuts("IoT Based");
+ 263   1              LCDCommand(0xc0); // Starting of Second Line
+ 264   1              LCDPuts("Energy Meter");
+ 265   1              delay(100); // Wait for 100 ms
+ 266   1              LCDCommand(0x01); // Clear LCD
+ 267   1              LCDPuts("Group Members");
+ 268   1              delay(100); // Wait for 100ms
+ 269   1              LCDCommand(0xc0); // Move the Cursor to Starting of Second Line
+ 270   1              LCDPuts("Arindam Das     ")     ;
+ 271   1              delay(100); // Wait for 100 ms
+ 272   1      
+ 273   1              LCDCommand(0xc0); // Move the Cursor to Starting of Second Line
+ 274   1              LCDPuts("Rajarshi Nath   ")     ;
+ 275   1              delay(100); // Wait for 100 ms
+ 276   1      
+ 277   1              LCDCommand(0xc0); // Move the Cursor to Starting of Second Line
+ 278   1              LCDPuts("Bitopan Nath    ");
+ 279   1              delay(100); // Wait for 100 ms
+ 280   1      
+ 281   1              LCDCommand(0xc0); // Move the Cursor to Starting of Second Line
+ 282   1              LCDPuts("Ripunjoy Kashyap");
+ 283   1              delay(100); // Wait for 100 ms
+ 284   1      
+ 285   1              LCDCommand(0xc0); // Move the Cursor to Starting of Second Line
+ 286   1              LCDPuts("Shadaab Ahmed   ");
+ 287   1              delay(100); // Wait for 100 ms
+ 288   1      
+ 289   1      
+ 290   1              
+ 291   1              LCDCommand(0xc0); // Move the Cursor to Starting of Second Line
+ 292   1              LCDPuts("AEC - EE- 2019  ");
+ 293   1              delay(100); // Wait for 100 ms 
+ 294   1        
+ 295   1      
+ 296   1              LCDCommand(0x01);
+ 297   1              LCDPuts("Starting.......");
+ 298   1              ESP8266_Init();
+ 299   1              delay(100);
+ 300   1      
+ 301   1          LCDCommand(0x01);
+ 302   1              LCDPuts("Pulse:");
+ 303   1              LCDCommand(0xc0);
+C51 COMPILER V8.12   CODE                                                                  04/24/2019 13:48:28 PAGE 6   
+
+ 304   1              LCDPuts("Unit :");
+ 305   1      
+ 306   1          LCDCommand(0x86);
+ 307   1          sprintf(buffer,"%5d",Pulse);
+ 308   1          LCDPuts(buffer);
+ 309   1         
+ 310   1         
+ 311   1              EEPROMRead(buffer);
+ 312   1              Unit=atoi(buffer);
+ 313   1         
+ 314   1         
+ 315   1          LCDCommand(0xc6);
+ 316   1          sprintf(buffer,"%5d",Unit);
+ 317   1              LCDPuts(buffer);
+ 318   1      
+ 319   1      
+ 320   1      
+ 321   1              while(1)
+ 322   1               {
+ 323   2                 
+ 324   2                   if(SENSOR==0) getPulse();   
+ 325   2                       
+ 326   2                       if(Pulse!=LastPulse)
+ 327   2                        {
+ 328   3                               LCDCommand(0x86);
+ 329   3                               sprintf(buffer,"%5d",Pulse);
+ 330   3                               LCDPuts(buffer);
+ 331   3                               LastPulse=Pulse;
+ 332   3                        }
+ 333   2                       if(Unit!=LastUnit)
+ 334   2                                {
+ 335   3                                  LCDCommand(0xc6);
+ 336   3                                  sprintf(buffer,"%5d",Unit);
+ 337   3                                  LCDPuts(buffer);
+ 338   3                                      startTCPConnection();
+ 339   3                              initTCP();
+ 340   3                              sendTCPData();
+ 341   3                                      LastUnit=Unit;
+ 342   3      
+ 343   3                                      //---------------------------
+ 344   3                                      EEPROMSave(strUnit);
+ 345   3                             //---------------------------
+ 346   3      
+ 347   3                                }
+ 348   2               }
+ 349   1      
+ 350   1       }
+ 351                    
+ 352          
+ 353          
+ 354          
+ 355          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1034    ----
+   CONSTANT SIZE    =    304    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     22      21
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+C51 COMPILER V8.12   CODE                                                                  04/24/2019 13:48:28 PAGE 7   
+
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
